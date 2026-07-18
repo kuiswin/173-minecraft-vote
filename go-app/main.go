@@ -6,8 +6,11 @@ import (
 	"fmt"
 	"log"
 	"math"
+	"math/rand"
 	"net/http"
 	"os"
+	"sort"
+	"strings"
 	"time"
 
 	"cloud.google.com/go/bigtable"
@@ -158,10 +161,11 @@ func main() {
 				return
 			}
 
-			// Bigtable row key: vote#<inverted_timestamp>#<username>
-			// Inverted timestamp allows newest items to be lexicographically sorted first
+			// Bigtable row key: <shard_id>#vote#<inverted_timestamp>#<username>
+			// Prepend a random shard ID (00-49) to distribute writes and avoid hot spotting
 			invertedTime := math.MaxInt64 - vote.Timestamp.UnixNano()
-			rowKey := fmt.Sprintf("vote#%019d#%s", invertedTime, vote.Username)
+			shardID := rand.Intn(50)
+			rowKey := fmt.Sprintf("%02d#vote#%019d#%s", shardID, invertedTime, vote.Username)
 
 			// Create mutation
 			mut := bigtable.NewMutation()
@@ -268,10 +272,11 @@ func main() {
 
 		var records []VoteRecord
 
-		// Scan row keys starting with "vote#"
-		// Limit to 50 rows
-		prefixRange := bigtable.PrefixRange("vote#")
-		err = tbl.ReadRows(ctx, prefixRange, func(row bigtable.Row) bool {
+		// Since keys are sharded/salted (e.g. 02#vote#...), read all rows and filter/sort in memory
+		err = tbl.ReadRows(ctx, bigtable.InfiniteRange(), func(row bigtable.Row) bool {
+			if !strings.Contains(row.Key(), "#vote#") {
+				return true
+			}
 			record := VoteRecord{
 				RowKey: row.Key(),
 			}
@@ -289,8 +294,18 @@ func main() {
 			}
 
 			records = append(records, record)
-			return len(records) < 50
+			return true
 		})
+
+		// Sort records descending by timestamp (newest first)
+		sort.Slice(records, func(i, j int) bool {
+			return records[i].Timestamp > records[j].Timestamp
+		})
+
+		// Limit to latest 50 records
+		if len(records) > 50 {
+			records = records[:50]
+		}
 
 		if err != nil {
 			log.Printf("API: Failed to read from Bigtable: %v", err)
