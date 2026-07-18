@@ -273,7 +273,7 @@ func main() {
 		var records []VoteRecord
 
 		// Since keys are sharded/salted (e.g. 02#vote#...), read all rows and filter/sort in memory
-		err = tbl.ReadRows(ctx, bigtable.InfiniteRange(), func(row bigtable.Row) bool {
+		err = tbl.ReadRows(ctx, bigtable.InfiniteRange(""), func(row bigtable.Row) bool {
 			if !strings.Contains(row.Key(), "#vote#") {
 				return true
 			}
