@@ -6,7 +6,7 @@ services:
     image: gcr.io/google.com/cloudsdktool/google-cloud-cli:emulators
     container_name: bigtable-emulator
     ports:
-      - "127.0.0.1:8089:8089"
+      - "8089:8089"
     command: gcloud beta emulators bigtable start --host-port=0.0.0.0:8089
     restart: always
 
@@ -15,13 +15,13 @@ services:
     image: gcr.io/google.com/cloudsdktool/google-cloud-cli:emulators
     container_name: pubsub-emulator
     ports:
-      - "127.0.0.1:8085:8085"
+      - "8085:8085"
     command: gcloud beta emulators pubsub start --host-port=0.0.0.0:8085
     restart: always
 
   # 3. Go Backend Application (API Server & Subscriber Worker)
   go-app:
-    build: .
+    build: ./go-app
     container_name: minecraft-vote-go-app
     depends_on:
       - bigtable-emulator

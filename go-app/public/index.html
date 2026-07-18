@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Minecraft Survey Portal (Bigtable + Pub/Sub)</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&family=Press+Start+2P&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="glass-bg"></div>
+    <div class="container">
+        <header>
+            <div class="badge">Google Cloud Bigtable</div>
+            <h1>Minecraft Survey Portal</h1>
+            <p class="subtitle">オーバーエンジニアリングで集計するマイクラアンケート</p>
+        </header>
+
+        <main class="grid">
+            <!-- Section 1: Vote Form -->
+            <section class="card glass-card">
+                <h2>📝 アンケート回答フォーム</h2>
+                <p class="card-desc">プレイヤー名を入力し、お気に入りの鉱石を選択してください。回答データは Pub/Sub を経由して Bigtable に超高速記録されます。</p>
+                
+                <div class="form-group">
+                    <label for="username">プレイヤーネーム</label>
+                    <input type="text" id="username" placeholder="Minecraft ID..." value="Player_Steve">
+                </div>
+
+                <div class="items-grid">
+                    <button class="vote-btn btn-diamond" data-item="Diamond">
+                        <div class="item-icon">💎</div>
+                        <div class="item-name">Diamond</div>
+                    </button>
+                    <button class="vote-btn btn-emerald" data-item="Emerald">
+                        <div class="item-icon">❇️</div>
+                        <div class="item-name">Emerald</div>
+                    </button>
+                    <button class="vote-btn btn-netherite" data-item="Netherite">
+                        <div class="item-icon">🪨</div>
+                        <div class="item-name">Netherite</div>
+                    </button>
+                    <button class="vote-btn btn-gold" data-item="Gold">
+                        <div class="item-icon">🪙</div>
+                        <div class="item-name">Gold</div>
+                    </button>
+                </div>
+            </section>
+
+            <!-- Section 2: Real-time Stats -->
+            <section class="card glass-card">
+                <h2>📊 Bigtable リアルタイム集計</h2>
+                <p class="card-desc">Bigtableに記録された最新のアンケートデータをもとにしたリアルタイム集計です。</p>
+                
+                <div class="stats-display">
+                    <div class="stat-box">
+                        <span class="stat-label">Diamond</span>
+                        <div class="progress-bar"><div class="bar bar-diamond" id="bar-Diamond" style="width: 0%;"></div></div>
+                        <span class="stat-count" id="count-Diamond">0件</span>
+                    </div>
+                    <div class="stat-box">
+                        <span class="stat-label">Emerald</span>
+                        <div class="progress-bar"><div class="bar bar-emerald" id="bar-Emerald" style="width: 0%;"></div></div>
+                        <span class="stat-count" id="count-Emerald">0件</span>
+                    </div>
+                    <div class="stat-box">
+                        <span class="stat-label">Netherite</span>
+                        <div class="progress-bar"><div class="bar bar-netherite" id="bar-Netherite" style="width: 0%;"></div></div>
+                        <span class="stat-count" id="count-Netherite">0件</span>
+                    </div>
+                    <div class="stat-box">
+                        <span class="stat-label">Gold</span>
+                        <div class="progress-bar"><div class="bar bar-gold" id="bar-Gold" style="width: 0%;"></div></div>
+                        <span class="stat-count" id="count-Gold">0件</span>
+                    </div>
+                </div>
+
+                <div class="total-badge">
+                    <span>総アンケート回答数:</span>
+                    <strong id="total-count">0</strong>
+                </div>
+            </section>
+        </main>
+
+        <!-- Section 3: Recent Logs -->
+        <section class="card glass-card full-width">
+            <div class="logs-header">
+                <h2>📋 Bigtable 時系列ログ (最新50件)</h2>
+                <button id="refresh-btn" class="refresh-btn">🔄 更新</button>
+            </div>
+            <p class="card-desc">Bigtable の行キー <code>vote#&lt;inverted_timestamp&gt;#&lt;username&gt;</code> をスキャンして取得したアンケート生回答の一覧です。</p>
+            
+            <div class="logs-container">
+                <table class="logs-table">
+                    <thead>
+                        <tr>
+                            <th>行キー (Bigtable RowKey)</th>
+                            <th>プレイヤー</th>
+                            <th>回答内容</th>
+                            <th>タイムスタンプ</th>
+                        </tr>
+                    </thead>
+                    <tbody id="logs-body">
+                        <tr>
+                            <td colspan="4" class="no-data">データ読み込み中...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    </div>
+
+    <!-- Notification Container -->
+    <div id="notification" class="notification"></div>
+
+    <script src="app.js"></script>
+</body>
+</html>
