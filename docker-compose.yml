@@ -9,6 +9,11 @@ services:
       - "127.0.0.1:8089:8089"
     command: gcloud beta emulators bigtable start --host-port=0.0.0.0:8089
     restart: always
+    deploy:
+      resources:
+        limits:
+          cpus: '0.50'
+          memory: 512M
 
   # 2. Google Cloud Pub/Sub Emulator
   pubsub-emulator:
@@ -18,6 +23,11 @@ services:
       - "127.0.0.1:8085:8085"
     command: gcloud beta emulators pubsub start --host-port=0.0.0.0:8085
     restart: always
+    deploy:
+      resources:
+        limits:
+          cpus: '0.50'
+          memory: 512M
 
   # 3. Go Backend Application (API Server & Subscriber Worker)
   go-app:
@@ -34,6 +44,11 @@ services:
       - GCP_PROJECT_ID=local-project
       - BIGTABLE_INSTANCE_ID=minecraft-instance
     restart: always
+    deploy:
+      resources:
+        limits:
+          cpus: '0.50'
+          memory: 512M
 
   # 4. Prometheus (Metrics Collector)
   prometheus:
@@ -46,6 +61,11 @@ services:
     volumes:
       - ./prometheus.yml:/etc/prometheus/prometheus.yml
     restart: always
+    deploy:
+      resources:
+        limits:
+          cpus: '0.25'
+          memory: 256M
 
   # 5. Grafana (Dashboard Visualizer)
   grafana:
@@ -62,3 +82,8 @@ services:
     volumes:
       - ./grafana/provisioning:/etc/grafana/provisioning
     restart: always
+    deploy:
+      resources:
+        limits:
+          cpus: '0.25'
+          memory: 256M
