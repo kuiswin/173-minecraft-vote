@@ -6,7 +6,7 @@ services:
     image: gcr.io/google.com/cloudsdktool/google-cloud-cli:emulators
     container_name: bigtable-emulator
     ports:
-      - "8089:8089"
+      - "127.0.0.1:8089:8089"
     command: gcloud beta emulators bigtable start --host-port=0.0.0.0:8089
     restart: always
 
@@ -15,7 +15,7 @@ services:
     image: gcr.io/google.com/cloudsdktool/google-cloud-cli:emulators
     container_name: pubsub-emulator
     ports:
-      - "8085:8085"
+      - "127.0.0.1:8085:8085"
     command: gcloud beta emulators pubsub start --host-port=0.0.0.0:8085
     restart: always
 
@@ -27,7 +27,7 @@ services:
       - bigtable-emulator
       - pubsub-emulator
     ports:
-      - "80:80"
+      - "127.0.0.1:80:80"
     environment:
       - BIGTABLE_EMULATOR_HOST=bigtable-emulator:8089
       - PUBSUB_EMULATOR_HOST=pubsub-emulator:8085
@@ -42,7 +42,7 @@ services:
     depends_on:
       - go-app
     ports:
-      - "9090:9090"
+      - "127.0.0.1:9090:9090"
     volumes:
       - ./prometheus.yml:/etc/prometheus/prometheus.yml
     restart: always
@@ -54,7 +54,7 @@ services:
     depends_on:
       - prometheus
     ports:
-      - "3000:3000"
+      - "127.0.0.1:3000:3000"
     environment:
       - GF_SECURITY_ADMIN_USER=admin
       - GF_SECURITY_ADMIN_PASSWORD=admin

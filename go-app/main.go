@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"math"
@@ -160,6 +161,7 @@ func main() {
 		sig := <-sigChan
 		log.Printf("Received termination signal %v. Shutting down gracefully...", sig)
 		cancelWorker()
+		// CRITICAL: Call Topic.Stop() during Graceful Shutdown to flush outstanding buffered messages and prevent data loss.
 		topic.Stop()
 	}()
 
@@ -190,9 +192,22 @@ func main() {
 			mut.Set(columnFamily, "username", bigtable.Now(), []byte(vote.Username))
 			mut.Set(columnFamily, "timestamp", bigtable.Now(), []byte(vote.Timestamp.Format(time.RFC3339)))
 
-			// Write to Bigtable
-			if err := tbl.Apply(ctx, rowKey, mut); err != nil {
-				log.Printf("Worker: Error applying mutation to Bigtable: %v", err)
+			// Write to Bigtable using ApplyBulk with robust error handling
+			errs, err := tbl.ApplyBulk(ctx, []string{rowKey}, []*bigtable.Mutation{mut})
+			var allErrs []error
+			if err != nil {
+				allErrs = append(allErrs, fmt.Errorf("systemic error: %w", err))
+			}
+			if errs != nil {
+				for _, rowErr := range errs {
+					if rowErr != nil {
+						allErrs = append(allErrs, fmt.Errorf("row error: %w", rowErr))
+					}
+				}
+			}
+			if len(allErrs) > 0 {
+				
+				log.Printf("Worker: Error applying mutation to Bigtable: %v", errors.Join(allErrs...)) // will use errors.Join
 				msg.Nack()
 				return
 			}
@@ -254,8 +269,16 @@ func main() {
 			return
 		}
 
+
+		// Prevent FlowControlBlock deadlock (Issue #20078 credit leaks) by validating message size pre-publish
+		if len(payloadBytes) > 10*1024*1024 { // Example 10MB limit
+			http.Error(w, "Payload too large", http.StatusRequestEntityTooLarge)
+			return
+		}
+
 		// Publish to Pub/Sub
-		result := topic.Publish(ctx, &pubsub.Message{
+		result := topic.Publish(context.WithoutCancel(r.Context()), &pubsub.Message{
+
 			Data: payloadBytes,
 		})
 
