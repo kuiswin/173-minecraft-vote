@@ -9,8 +9,10 @@ import (
 	"math/rand"
 	"net/http"
 	"os"
+	"os/signal"
 	"sort"
 	"strings"
+	"syscall"
 	"time"
 
 	"cloud.google.com/go/bigtable"
@@ -141,17 +143,32 @@ func main() {
 		}
 	}
 
+	// Initialize Bigtable Client once and share it
+	btClient, err := bigtable.NewClient(ctx, projectID, instanceID, option.WithoutAuthentication())
+	if err != nil {
+		log.Fatalf("Failed to create Bigtable Client: %v", err)
+	}
+	defer btClient.Close()
+
+	workerCtx, cancelWorker := context.WithCancel(context.Background())
+	defer cancelWorker()
+
+	// Listen for termination signals for Graceful Shutdown
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
+	go func() {
+		sig := <-sigChan
+		log.Printf("Received termination signal %v. Shutting down gracefully...", sig)
+		cancelWorker()
+		topic.Stop()
+	}()
+
 	// 3. Start Background Subscriber Worker
 	go func() {
 		log.Printf("Worker: Starting subscriber for %s", subscriptionID)
-		client, err := bigtable.NewClient(ctx, projectID, instanceID, option.WithoutAuthentication())
-		if err != nil {
-			log.Fatalf("Worker: Failed to create Bigtable Client: %v", err)
-		}
-		defer client.Close()
-		tbl := client.Open(tableName)
+		tbl := btClient.Open(tableName)
 
-		err = sub.Receive(ctx, func(ctx context.Context, msg *pubsub.Message) {
+		err = sub.Receive(workerCtx, func(ctx context.Context, msg *pubsub.Message) {
 			log.Printf("Worker: Received vote message: %s", string(msg.Data))
 
 			var vote VotePayload
@@ -184,7 +201,7 @@ func main() {
 			votesCounter.WithLabelValues(vote.Item).Inc()
 			msg.Ack()
 		})
-		if err != nil {
+		if err != nil && err != context.Canceled {
 			log.Fatalf("Worker: Receive error: %v", err)
 		}
 	}()
@@ -262,17 +279,11 @@ func main() {
 			return
 		}
 
-		client, err := bigtable.NewClient(ctx, projectID, instanceID, option.WithoutAuthentication())
-		if err != nil {
-			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
-			return
-		}
-		defer client.Close()
-		tbl := client.Open(tableName)
+		tbl := btClient.Open(tableName)
 
 		var records []VoteRecord
 
-		// Since keys are sharded/salted (e.g. 02#vote#...), read all rows and filter/sort in memory
+		// Since keys are sharded/salted (e.g. 02#vote#...), read rows and filter/sort in memory. Limit to 50 rows on server side.
 		err = tbl.ReadRows(ctx, bigtable.InfiniteRange(""), func(row bigtable.Row) bool {
 			if !strings.Contains(row.Key(), "#vote#") {
 				return true
@@ -295,7 +306,7 @@ func main() {
 
 			records = append(records, record)
 			return true
-		})
+		}, bigtable.LimitRows(50))
 
 		// Sort records descending by timestamp (newest first)
 		sort.Slice(records, func(i, j int) bool {
