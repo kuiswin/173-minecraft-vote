@@ -18,8 +18,6 @@ import (
 
 	"cloud.google.com/go/bigtable"
 	"cloud.google.com/go/pubsub"
-	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"google.golang.org/api/option"
 )
 
@@ -46,21 +44,6 @@ type VoteRecord struct {
 	Item      string `json:"item"`
 	Timestamp string `json:"timestamp"`
 	RowKey    string `json:"row_key"`
-}
-
-// Metrics
-var (
-	votesCounter = prometheus.NewCounterVec(
-		prometheus.CounterOpts{
-			Name: "minecraft_votes_total",
-			Help: "Total number of Minecraft votes processed and written to Bigtable.",
-		},
-		[]string{"item"},
-	)
-)
-
-func init() {
-	prometheus.MustRegister(votesCounter)
 }
 
 func main() {
@@ -213,7 +196,6 @@ func main() {
 			}
 
 			log.Printf("Worker: Successfully saved vote key %s to Bigtable.", rowKey)
-			votesCounter.WithLabelValues(vote.Item).Inc()
 			msg.Ack()
 		})
 		if err != nil && err != context.Canceled {
@@ -222,7 +204,6 @@ func main() {
 	}()
 
 	// 4. Start HTTP Server
-	http.Handle("/metrics", promhttp.Handler())
 
 	// Serve Static Files
 	fs := http.FileServer(http.Dir("./public"))

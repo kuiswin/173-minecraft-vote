@@ -5,7 +5,6 @@ go 1.25.0
 require (
 	cloud.google.com/go/bigtable v1.42.0
 	cloud.google.com/go/pubsub v1.51.0
-	github.com/prometheus/client_golang v1.19.1
 	google.golang.org/api v0.287.1
 )
 

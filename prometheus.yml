@@ -1,8 +1,0 @@
-global:
-  scrape_interval: 5s
-  evaluation_interval: 5s
-
-scrape_configs:
-  - job_name: 'minecraft-vote-app'
-    static_configs:
-      - targets: ['go-app:80']
